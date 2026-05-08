@@ -59,13 +59,16 @@ public class NotificationService : INotificationService
             throw new ArgumentException("Message is required.");
         }
 
+        var vietnamTimeZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
+        var vietnamTime = TimeZoneInfo.ConvertTime(DateTime.UtcNow, vietnamTimeZone);
+
         var entity = new Notification
         {
             Title = request.Title.Trim(),
             Message = request.Message.Trim(),
             OrderId = request.OrderId,
             IsRead = false,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = vietnamTime
         };
 
         var created = await _notificationRepository.AddAsync(entity);

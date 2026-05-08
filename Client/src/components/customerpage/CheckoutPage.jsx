@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import Swal from 'sweetalert2'
 import useAuthSession from '../../hooks/useAuthSession'
-import { checkoutCod, checkoutCodGuest, checkoutVnPay } from '../../services/orderApi'
+import { checkoutCod, checkoutCodGuest } from '../../services/orderApi'
 
 const currency = new Intl.NumberFormat('vi-VN', {
   style: 'currency',
@@ -100,21 +100,6 @@ function CheckoutPage({ cartItems = [], onRefreshCart = async () => {}, onClearC
         return
       }
 
-      if (values.paymentMethod === 'vnpay') {
-        const result = await checkoutVnPay({
-          ...payload,
-          selectedProductIds: checkoutItems.map((item) => Number(item.id)),
-        })
-        await Swal.fire({
-          icon: 'success',
-          title: 'Chuyển sang thanh toán VNPAY',
-          text: `Đơn hàng #${result.orderId} đã được tạo. Bạn sẽ được chuyển đến cổng thanh toán.`,
-          confirmButtonText: 'Thanh toán ngay',
-        })
-        window.location.href = result.paymentUrl
-        return
-      }
-
       const result = await checkoutCod({
         ...payload,
         selectedProductIds: checkoutItems.map((item) => Number(item.id)),
@@ -157,7 +142,7 @@ function CheckoutPage({ cartItems = [], onRefreshCart = async () => {}, onClearC
         <h1 className="mt-2 text-3xl font-black text-zinc-900">Thanh toán đơn hàng</h1>
         <p className="mt-2 text-sm text-zinc-500">
           {isAuthenticated
-            ? 'Bạn có thể chọn thanh toán COD hoặc VNPAY.'
+            ? 'Bạn có thể chọn thanh toán COD.'
             : 'Khách vãng lai chỉ thanh toán khi nhận hàng (COD).'}
         </p>
       </div>
@@ -222,13 +207,8 @@ function CheckoutPage({ cartItems = [], onRefreshCart = async () => {}, onClearC
                   <input type="radio" value="cod" {...register('paymentMethod')} />
                 </label>
 
-                {isAuthenticated ? (
-                  <label className="flex cursor-pointer items-center justify-between rounded-xl border border-zinc-300 bg-white px-4 py-3 text-sm">
-                    <span>Thanh toán VNPAY</span>
-                    <input type="radio" value="vnpay" {...register('paymentMethod')} />
-                  </label>
-                ) : (
-                  <p className="text-xs text-zinc-500">Đăng nhập để dùng VNPAY.</p>
+                {isAuthenticated ? null : (
+                  <p className="text-xs text-zinc-500">Đăng nhập để dùng phương thức thanh toán trực tuyến.</p>
                 )}
               </div>
             </div>
@@ -274,9 +254,7 @@ function CheckoutPage({ cartItems = [], onRefreshCart = async () => {}, onClearC
           </div>
 
           <div className="mt-6 rounded-2xl border border-dashed border-zinc-300 p-4 text-sm text-zinc-600">
-            {watch('paymentMethod') === 'vnpay' && isAuthenticated
-              ? 'Sau khi xác nhận, bạn sẽ được chuyển sang cổng thanh toán VNPAY.'
-              : 'Đơn hàng COD sẽ được tạo ngay sau khi bạn xác nhận.'}
+            {'Đơn hàng COD sẽ được tạo ngay sau khi bạn xác nhận.'}
           </div>
         </aside>
       </div>

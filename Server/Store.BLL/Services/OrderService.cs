@@ -1,9 +1,7 @@
 using Microsoft.AspNetCore.SignalR;
-using Microsoft.Extensions.Configuration;
 using Store.BLL.Hubs;
 using Store.BLL.DTOs.Order;
 using Store.BLL.DTOs.Notification;
-using Store.BLL.DTOs.Payment;
 using Store.BLL.Interfaces;
 using Store.DAL.Interfaces;
 using Store.DAL.Models;
@@ -14,7 +12,6 @@ public class OrderService : IOrderService
 {
     private const string DraftStatus = "draft";
     private const string ShipCodMethod = "shipcod";
-    private const string VnPayMethod = "vnpay";
     private const string PendingConfirmStatus = "pending_confirm";
     private const string PendingPaymentStatus = "pending_payment";
     private const string ConfirmedStatus = "confirmed";
@@ -51,9 +48,7 @@ public class OrderService : IOrderService
 
     private readonly ICartRepository _cartRepository;
     private readonly IOrderRepository _orderRepository;
-    private readonly IVnPayService _vnPayService;
     private readonly INotificationService _notificationService;
-    private readonly string _vnpayReturnUrl;
     private readonly IHubContext<OrderNotificationHub> _hubContext;
     private readonly IEmailService _emailService;
     private static readonly TimeZoneInfo VietnamTimeZone = ResolveVietnamTimeZone();
@@ -61,17 +56,12 @@ public class OrderService : IOrderService
     public OrderService(
         ICartRepository cartRepository,
         IOrderRepository orderRepository,
-        IVnPayService vnPayService,
-        IConfiguration configuration,
         IHubContext<OrderNotificationHub> hubContext,
         INotificationService notificationService,
         IEmailService emailService)
     {
         _cartRepository = cartRepository;
         _orderRepository = orderRepository;
-        _vnPayService = vnPayService;
-        _vnpayReturnUrl = configuration["VnPay:ReturnUrl"]
-                          ?? throw new InvalidOperationException("VnPay:ReturnUrl is missing.");
         _hubContext = hubContext;
         _notificationService = notificationService;
         _emailService = emailService;
@@ -196,49 +186,6 @@ public class OrderService : IOrderService
         return MapCheckoutResult(order);
     }
 
-    public async Task<CheckoutVnPayResultDto> CheckoutVnPayAsync(int userId, CheckoutVnPayRequest request,
-        string? clientIp)
-    {
-        EnsureValidUser(userId);
-        ValidateCustomerInfo(request.CustomerName, request.CustomerPhone, request.ShippingAddress);
-
-        var cartItems = await _cartRepository.GetCartItemsWithProductAsync(userId);
-        var reusableOrder = await GetReusablePendingOrderAsync(userId);
-        var checkoutCartItems = ResolveCheckoutCartItems(cartItems, request.SelectedProductIds);
-
-        if (checkoutCartItems.Count == 0)
-        {
-            if (request.SelectedProductIds.Count == 0 &&
-                reusableOrder is not null &&
-                string.Equals(reusableOrder.PaymentMethod, VnPayMethod, StringComparison.OrdinalIgnoreCase))
-            {
-                return BuildVnPayResult(reusableOrder, clientIp);
-            }
-
-            throw new ArgumentException("Giỏ hàng trống.");
-        }
-
-        var itemPayload = checkoutCartItems.Select(c => (c.ProductId, c.Quantity, c.Product)).ToList();
-        ValidateCartItems(itemPayload);
-
-        var order = BuildAuthenticatedOrder(
-            userId,
-            request.CustomerName,
-            request.CustomerPhone,
-            request.CustomerEmail,
-            request.ShippingAddress,
-            VnPayMethod,
-            PendingPaymentStatus,
-            reusableOrder,
-            itemPayload.Sum(c => (c.Product.Price ?? 0m) * c.Quantity));
-
-        var orderItems = BuildOrderItems(itemPayload);
-
-        await _orderRepository.UpsertOrderWithItemsAsync(order, orderItems);
-
-        return BuildVnPayResult(order, clientIp);
-    }
-
     public async Task<IEnumerable<OrderSummaryDto>> LookupOrdersByEmailAsync(string email)
     {
         if (string.IsNullOrWhiteSpace(email))
@@ -246,54 +193,6 @@ public class OrderService : IOrderService
 
         var orders = await _orderRepository.GetOrdersByEmailAsync(email);
         return orders.OrderByDescending(o => o.CreatedAt).Select(MapOrderSummary);
-    }
-
-    public async Task<OrderSummaryDto?> ConfirmVnPayOrderAsync(int orderId)
-    {
-        if (orderId <= 0) throw new ArgumentException("OrderId không hợp lệ.");
-
-        var order = await _orderRepository.GetOrderWithItemsAsync(orderId);
-        if (order is null)
-            return null;
-
-        if (!string.Equals(order.PaymentMethod, VnPayMethod, StringComparison.OrdinalIgnoreCase))
-            throw new ArgumentException("Đơn hàng này không phải thanh toán bằng VNPAY.");
-
-        if (IsExpired(order, GetVietnamNow()))
-        {
-            order.Status = ExpiredStatus;
-            await _orderRepository.SaveChangesAsync();
-            throw new ArgumentException("Đơn hàng đã hết hạn.");
-        }
-
-        if (string.Equals(order.Status, ConfirmedStatus, StringComparison.OrdinalIgnoreCase))
-            return MapOrderSummary(order);
-
-        order.Status = ConfirmedStatus;
-        await _orderRepository.SaveChangesAsync();
-        await NotifyOrderPaidAsync(order);
-
-        if (order.UserId.HasValue)
-        {
-            var cartItems = await _cartRepository.GetCartItemsWithProductAsync(order.UserId.Value);
-
-            var orderProductIds = order.OrderItems
-                .Where(x => x.ProductId.HasValue)
-                .Select(x => x.ProductId!.Value)
-                .ToHashSet();
-
-            var cartsToRemove = cartItems
-                .Where(c => orderProductIds.Contains(c.ProductId))
-                .ToList();
-
-            if (cartsToRemove.Count > 0)
-            {
-                _cartRepository.RemoveRange(cartsToRemove);
-                await _cartRepository.SaveChangesAsync();
-            }
-        }
-
-        return MapOrderSummary(order);
     }
 
     public async Task<IEnumerable<OrderSummaryDto>> GetMyOrdersAsync(int userId)
@@ -379,26 +278,6 @@ public class OrderService : IOrderService
 
         order.Status = normalizedStatus;
         await _orderRepository.SaveChangesAsync();
-    }
-
-    public async Task<OrderSummaryDto?> MarkVnPayOrderFailedAsync(int orderId)
-    {
-        if (orderId <= 0) throw new ArgumentException("OrderId không hợp lệ.");
-
-        var order = await _orderRepository.GetOrderWithItemsAsync(orderId);
-        if (order is null)
-            return null;
-
-        if (!string.Equals(order.PaymentMethod, VnPayMethod, StringComparison.OrdinalIgnoreCase))
-            throw new ArgumentException("Đơn hàng này không phải thanh toán bằng VNPAY.");
-
-        if (string.Equals(order.Status, ConfirmedStatus, StringComparison.OrdinalIgnoreCase))
-            return MapOrderSummary(order);
-
-        order.Status = IsExpired(order, GetVietnamNow()) ? ExpiredStatus : CancelledStatus;
-        await _orderRepository.SaveChangesAsync();
-
-        return MapOrderSummary(order);
     }
 
     private async Task ExpireStalePendingOrdersAsync(int userId)
@@ -551,33 +430,6 @@ public class OrderService : IOrderService
         };
     }
 
-    private CheckoutVnPayResultDto BuildVnPayResult(Order order, string? clientIp)
-    {
-        var now = GetVietnamNow();
-        var expiresAt = now.Add(PendingOrderLifetime);
-
-        var paymentUrl = _vnPayService.CreatePaymentUrl(new VnPayCreatePaymentRequest
-        {
-            OrderId = order.Id,
-            Amount = order.TotalAmount ?? 0m,
-            OrderInfo = $"Thanh toán đơn hàng #{order.Id}",
-            ClientIp = clientIp ?? "127.0.0.1",
-            ReturnUrl = _vnpayReturnUrl,
-            CreatedAt = now,
-            ExpireAt = expiresAt
-        });
-
-        return new CheckoutVnPayResultDto
-        {
-            OrderId = order.Id,
-            TotalAmount = order.TotalAmount ?? 0m,
-            PaymentMethod = VnPayMethod,
-            Status = order.Status ?? PendingPaymentStatus,
-            PaymentUrl = paymentUrl,
-            CreatedAt = now,
-            ExpiresAt = expiresAt
-        };
-    }
 
     private static OrderSummaryDto MapOrderSummary(Order order)
     {

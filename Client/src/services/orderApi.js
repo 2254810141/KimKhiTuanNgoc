@@ -54,12 +54,6 @@ export async function checkoutCodGuest(payload) {
   })
 }
 
-export async function checkoutVnPay(payload) {
-  return requestJson('/api/Order/checkout/vnpay', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  }, true)
-}
 
 export async function getMyOrders() {
   const data = await requestJson('/api/Order/my', {
