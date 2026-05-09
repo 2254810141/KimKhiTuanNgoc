@@ -17,6 +17,23 @@ var jwtKey = jwtSection["Key"] ?? throw new InvalidOperationException("Jwt:Key i
 var issuer = jwtSection["Issuer"];
 var audience = jwtSection["Audience"];
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+var configuredCorsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? Array.Empty<string>();
+var allowedCorsOrigins = configuredCorsOrigins
+    .Select(origin => origin.Trim())
+    .Where(origin => !string.IsNullOrWhiteSpace(origin))
+    .Select(origin => origin.TrimEnd('/'))
+    .Distinct(StringComparer.OrdinalIgnoreCase)
+    .ToArray();
+var localCorsOrigins = new[]
+{
+    "http://localhost:5173",
+    "https://localhost:5173",
+    "http://localhost:5174",
+    "https://localhost:5174",
+    "http://localhost:5175",
+    "https://localhost:5175"
+};
+var clientCorsOrigins = allowedCorsOrigins.Concat(localCorsOrigins).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
 
 
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -31,11 +48,7 @@ builder.Services.AddCors(options =>
     options.AddPolicy("ClientPolicy", policy =>
     {
         policy
-            .WithOrigins(
-                "http://localhost:5173",
-                "https://localhost:5173",
-                "http://localhost:5175",
-                "https://localhost:5175")
+            .WithOrigins(clientCorsOrigins)
             .AllowAnyHeader()
             .AllowAnyMethod()
             .AllowCredentials();

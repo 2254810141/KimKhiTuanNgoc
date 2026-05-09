@@ -42,7 +42,7 @@ function BannerPopup() {
         
         <div className="rounded-xl overflow-hidden shadow-2xl">
           <img
-            src="https://res.cloudinary.com/djbupbycd/image/upload/v1777999107/banner1_nj1g6x.png"
+            src="https://res.cloudinary.com/djbupbycd/image/upload/v1778231130/66302042094691731_hfo7xz.jpg"
             alt="Banner PhươngTrang Store"
             className="w-full h-auto"
           />

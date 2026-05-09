@@ -186,7 +186,6 @@ function AdminProductPage() {
     }
   }
 
-  const priceValue = watch('price')
   const priceDisabled = Boolean(isContactPrice)
 
   return (

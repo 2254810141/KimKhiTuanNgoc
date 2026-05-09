@@ -35,15 +35,17 @@ npm install
 npm run dev
 ```
 
-Mac dinh frontend goi API toi:
+Frontend doc `VITE_API_BASE_URL` tu file env cua Vite.
 
-- `http://localhost:5026`
+- Tao file `.env.local` trong thu muc `Client/` voi noi dung:
 
-Co the override bang file `.env`:
-
-```bash
+```env
 VITE_API_BASE_URL=http://localhost:5026
 ```
+
+Khi deploy, doi gia tri nay sang URL API that te, vi du `https://api.your-domain.com`.
+
+Neu can mau cau hinh, copy tu `.env.example`.
 
 ## Kiem tra
 

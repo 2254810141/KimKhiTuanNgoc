@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import Swal from 'sweetalert2'
 
@@ -25,7 +25,7 @@ function AdminSimpleCrudPage({
     },
   })
 
-  const refreshItems = async () => {
+  const refreshItems = useCallback(async () => {
     setIsLoading(true)
     setError('')
 
@@ -37,11 +37,11 @@ function AdminSimpleCrudPage({
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [entityLabel, loadItems])
 
   useEffect(() => {
     void refreshItems()
-  }, [])
+  }, [refreshItems])
 
   const openCreateModal = () => {
     setSelectedItem(null)

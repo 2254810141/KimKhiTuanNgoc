@@ -1,7 +1,6 @@
 import axios from 'axios'
 import { getAuthSession } from '../utils/authSession'
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5026'
+import { API_BASE_URL } from '../utils/apiBaseUrl'
 
 const adminApi = axios.create({
   baseURL: API_BASE_URL,

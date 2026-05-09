@@ -16,7 +16,10 @@ function CheckoutPage({ cartItems = [], onRefreshCart = async () => {}, onClearC
   const location = useLocation()
   const { session } = useAuthSession()
   const isAuthenticated = Boolean(session?.accessToken)
-  const selectedProductIds = Array.isArray(location.state?.selectedProductIds) ? location.state.selectedProductIds : []
+  const selectedProductIds = useMemo(
+    () => (Array.isArray(location.state?.selectedProductIds) ? location.state.selectedProductIds : []),
+    [location.state],
+  )
 
   const checkoutItems = useMemo(() => {
     if (selectedProductIds.length === 0) {
@@ -29,7 +32,7 @@ function CheckoutPage({ cartItems = [], onRefreshCart = async () => {}, onClearC
 
   const hasContactItems = checkoutItems.some((item) => item.isContactPrice)
 
-  const { register, handleSubmit, reset, watch, formState: { errors, isSubmitting } } = useForm({
+    const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm({
     defaultValues: {
       customerName: '',
       customerPhone: '',

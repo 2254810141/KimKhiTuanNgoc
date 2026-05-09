@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from 'react'
+﻿import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import Swal from 'sweetalert2'
 import useAuthSession from '../../hooks/useAuthSession'
@@ -37,7 +37,7 @@ function OrderHistoryPage() {
 
   const isAuthenticated = Boolean(session?.accessToken)
 
-  const refreshOrders = async () => {
+  const refreshOrders = useCallback(async () => {
     if (!isAuthenticated) {
       setOrders([])
       setError('')
@@ -56,11 +56,11 @@ function OrderHistoryPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [isAuthenticated])
 
   useEffect(() => {
     void refreshOrders()
-  }, [isAuthenticated])
+  }, [refreshOrders])
 
   const totalOrders = useMemo(() => orders.length, [orders])
 

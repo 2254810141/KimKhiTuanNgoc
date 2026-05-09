@@ -1,10 +1,10 @@
-﻿import { useEffect, useState } from 'react'
+﻿import { useState } from 'react'
 import { useOrderNotifications } from '../../hooks/useOrderNotifications'
 import { formatVnd } from '../../utils/product'
 
 function NotificationCenter() {
   const [toasts, setToasts] = useState([])
-  const { notificationCount, latestNotification, isConnected, resetLatestNotification } = useOrderNotifications((notification) => {
+  useOrderNotifications((notification) => {
     // Add new toast
     const id = Date.now()
     setToasts((prev) => [
@@ -20,8 +20,6 @@ function NotificationCenter() {
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id))
     }, 8000)
-
-    resetLatestNotification()
   })
 
   const removeToast = (id) => {

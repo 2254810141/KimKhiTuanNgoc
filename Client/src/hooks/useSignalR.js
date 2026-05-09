@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useCallback } from 'react'
+﻿import { useEffect, useRef, useCallback, useState } from 'react'
 import * as signalR from '@microsoft/signalr'
 import useAuthSession from './useAuthSession'
 
@@ -7,6 +7,8 @@ export function useSignalR(hubUrl) {
   const { session } = useAuthSession()
   const token = session?.accessToken
   const reconnectTimeoutRef = useRef(null)
+  const connectRef = useRef(null)
+  const [isConnected, setIsConnected] = useState(false)
 
   const connect = useCallback(async () => {
     if (connectionRef.current?.state === signalR.HubConnectionState.Connected) {
@@ -26,15 +28,20 @@ export function useSignalR(hubUrl) {
       connectionRef.current = connection
 
       await connection.start()
+      setIsConnected(true)
       console.log('SignalR connected')
     } catch (error) {
       console.error('SignalR connection error:', error)
       // Retry after 5 seconds
       reconnectTimeoutRef.current = setTimeout(() => {
-        connect()
+        void connectRef.current?.()
       }, 5000)
     }
   }, [token, hubUrl])
+
+  useEffect(() => {
+    connectRef.current = connect
+  }, [connect])
 
   const disconnect = useCallback(async () => {
     if (reconnectTimeoutRef.current) {
@@ -44,6 +51,7 @@ export function useSignalR(hubUrl) {
     if (connectionRef.current) {
       try {
         await connectionRef.current.stop()
+        setIsConnected(false)
       } catch (error) {
         console.error('Error stopping connection:', error)
       }
@@ -63,9 +71,13 @@ export function useSignalR(hubUrl) {
   }, [])
 
   useEffect(() => {
-    if (token) {
-      connect()
+    const startConnection = async () => {
+      if (token) {
+        await connect()
+      }
     }
+
+    void startConnection()
 
     return () => {
       disconnect()
@@ -73,8 +85,7 @@ export function useSignalR(hubUrl) {
   }, [token, connect, disconnect])
 
   return {
-    connection: connectionRef.current,
-    isConnected: connectionRef.current?.state === signalR.HubConnectionState.Connected,
+    isConnected,
     on,
     off,
   }

@@ -1,5 +1,5 @@
 ﻿import Swal from 'sweetalert2'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
 const currency = new Intl.NumberFormat('vi-VN', {
@@ -12,9 +12,6 @@ function CartPage({ cartItems = [], onRemoveItem = () => {}, onUpdateQuantity = 
   const navigate = useNavigate()
   const [selectedProductIds, setSelectedProductIds] = useState([])
 
-  useEffect(() => {
-    setSelectedProductIds((prev) => prev.filter((id) => cartItems.some((item) => String(item.id) === String(id))))
-  }, [cartItems])
 
   const selectedItems = useMemo(
     () => cartItems.filter((item) => selectedProductIds.some((id) => String(id) === String(item.id))),

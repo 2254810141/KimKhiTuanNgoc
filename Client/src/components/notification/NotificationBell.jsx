@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState } from 'react'
+﻿import { useCallback, useEffect, useRef, useState } from 'react'
 import { getUnreadNotifications, markNotificationAsRead } from '../../services/adminApi'
 import { useOrderNotifications } from '../../hooks/useOrderNotifications'
 
@@ -21,7 +21,7 @@ function NotificationBell() {
   const [notifications, setNotifications] = useState([])
   const dropdownRef = useRef(null)
 
-  const syncUnreadList = async () => {
+  const syncUnreadList = useCallback(async () => {
 	try {
 	  const result = await getUnreadNotifications()
 	  setUnreadCount(Number(result?.count ?? 0))
@@ -30,11 +30,22 @@ function NotificationBell() {
 	  setUnreadCount(0)
 	  setNotifications([])
 	}
-  }
+  }, [])
 
   useEffect(() => {
-	void syncUnreadList()
-  }, [])
+	let isMounted = true
+
+	const loadUnreadNotifications = async () => {
+	  if (!isMounted) return
+	  await syncUnreadList()
+	}
+
+	void loadUnreadNotifications()
+
+	return () => {
+	  isMounted = false
+	}
+  }, [syncUnreadList])
 
   useEffect(() => {
 	const handleClickOutside = (event) => {
@@ -47,8 +58,7 @@ function NotificationBell() {
 	return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const handleNewOrderCreated = useMemo(
-	() => (notification) => {
+  const handleNewOrderCreated = useCallback((notification) => {
 	  setUnreadCount((current) => current + 1)
 	  setNotifications((current) => {
 		const nextItem = {
@@ -63,9 +73,7 @@ function NotificationBell() {
 		const withoutDuplicate = current.filter((item) => item.id !== nextItem.id)
 		return [nextItem, ...withoutDuplicate].slice(0, 5)
 	  })
-	},
-	[]
-  )
+	}, [])
 
   useOrderNotifications(handleNewOrderCreated)
 
